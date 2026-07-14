@@ -108,7 +108,7 @@ class DownloadButton @JvmOverloads constructor(context: Context, attrs: Attribut
                 binding.downloadProgress.isIndeterminate = false
                 binding.downloadProgress.progress = progress
                 binding.downloadBorder.drawable.setTint(progressBGColor)
-                binding.downloadProgress.progressDrawable?.setTint(downloadedColor)
+                binding.downloadProgress.setIndicatorColor(downloadedColor)
                 binding.downloadIcon.drawable.setTint(disabledColor)
                 if (!isAnimating) {
                     iconAnimation = ObjectAnimator.ofFloat(binding.downloadIcon, "alpha", 1f, 0f).apply {

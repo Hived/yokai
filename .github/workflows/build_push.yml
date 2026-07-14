@@ -2,11 +2,8 @@ name: Build app
 
 run-name: ${{ github.event_name == 'workflow_dispatch' && format('Build and Release v{0}', github.event.inputs.version) || github.event.commits[0].message }}
 
+# Push trigger removed on this fork — builds run manually via "Run workflow" only.
 on:
-  push:
-    branches:
-      - master
-      - backport/**
   workflow_dispatch:
     inputs:
       version:
@@ -232,14 +229,13 @@ jobs:
         if: startsWith(env.VERSION_TAG, 'r')
         uses: softprops/action-gh-release@v2
         with:
-          repository: null2264/yokai-nightly
           tag_name: ${{ env.VERSION_TAG }}
           name: Yōkai Nightly (${{ env.VERSION_TAG }})
           body: |
             > [!CAUTION]
             > _**This alpha version is for testing only!**_
             >
-            > This build is triggered by commit [`${{ env.COMMIT_SHORT_HASH }}`](https://github.com/null2264/yokai/commit/${{ env.COMMIT_HASH }})
+            > This build is triggered by commit [`${{ env.COMMIT_SHORT_HASH }}`](https://github.com/${{ github.repository }}/commit/${{ env.COMMIT_HASH }})
 
             It is not ready for daily use and we do not guarantee its usability. Please download the latest stable releases instead (https://github.com/null2264/yokai/releases/latest). If you insist, please be sure to ALWAYS backup before updating.
 
@@ -266,5 +262,5 @@ jobs:
             yokai-x86-${{ env.VERSION_TAG }}.apk
             yokai-x86_64-${{ env.VERSION_TAG }}.apk
           draft: false
-          prerelease: false
-          token: ${{ secrets.NIGHTLY_PAT }}
+          prerelease: true
+          token: ${{ secrets.GITHUB_TOKEN }}

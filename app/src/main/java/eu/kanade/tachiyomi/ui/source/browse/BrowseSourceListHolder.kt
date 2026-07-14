@@ -29,6 +29,8 @@ class BrowseSourceListHolder(
 
     private val binding = MangaListItemBinding.bind(view)
 
+    private var duplicatedInLibrary = false
+
     init {
         setCards(showOutline, binding.card, binding.unreadDownloadBadge.badgeView)
     }
@@ -42,6 +44,7 @@ class BrowseSourceListHolder(
     override fun onSetValues(manga: Manga) {
         binding.title.text = manga.title
         binding.inLibraryBadge.badge.isVisible = manga.favorite
+        binding.duplicatedInLibraryBadge.badge.isVisible = !manga.favorite && duplicatedInLibrary
 
         setImage(manga)
     }
@@ -53,7 +56,11 @@ class BrowseSourceListHolder(
         } else {
             manga.id ?: return
             binding.coverThumbnail.loadManga(manga.cover())
-            binding.coverThumbnail.alpha = if (manga.favorite) 0.34f else 1.0f
+            binding.coverThumbnail.alpha = if (manga.favorite || duplicatedInLibrary) 0.34f else 1.0f
         }
+    }
+
+    override fun setDuplicatedInLibrary(duplicated: Boolean) {
+        duplicatedInLibrary = duplicated
     }
 }

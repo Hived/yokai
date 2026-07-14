@@ -366,6 +366,8 @@ class PreferencesHelper(val context: Context, val preferenceStore: PreferenceSto
 
     fun hideInLibraryItems() = preferenceStore.getBoolean("browse_hide_in_library_items", false)
 
+    fun showDuplicatedInLibraryItems() = preferenceStore.getBoolean("browse_show_duplicated_in_library_items", false)
+
     // Tutorial preferences
     fun shownFilterTutorial() = preferenceStore.getBoolean("shown_filter_tutorial", false)
 

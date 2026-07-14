@@ -5,12 +5,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.recyclerview.widget.RecyclerView
 import dev.icerock.moko.resources.compose.stringResource
 import eu.davidea.flexibleadapter.FlexibleAdapter
 import eu.davidea.flexibleadapter.items.IFlexible
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.domain.manga.models.Manga
+import eu.kanade.tachiyomi.util.system.getResourceColor
 import yokai.domain.manga.models.MangaCover
 import yokai.domain.manga.models.cover
 import yokai.i18n.MR
@@ -36,6 +39,7 @@ class BrowseSourceGridHolder(
 
     var title by mutableStateOf("")
     var cover by mutableStateOf(MangaCover(0L, 0L, "", 0L, false))
+    private var showDuplicatedBadge by mutableStateOf(false)
 
     init {
         view.setContent {
@@ -49,12 +53,21 @@ class BrowseSourceGridHolder(
                                 textColor = MaterialTheme.colorScheme.onSecondary,
                             )
                         )
+                    else if (showDuplicatedBadge)
+                        add(
+                            BadgeSegment.text(
+                                backgroundColor = Color(view.context.getResourceColor(R.attr.colorSecondaryVariant)),
+                                text = stringResource(MR.strings.duplicated_in_library),
+                                textColor = MaterialTheme.colorScheme.onSecondary,
+                            )
+                        )
                 }
+                val dimCover = cover.inLibrary || showDuplicatedBadge
                 if (compact) {
                     MangaCompactGridItem(
                         coverData = cover,
                         title = title,
-                        isSelected = cover.inLibrary,
+                        isSelected = dimCover,
                         showOutline = showOutline,
                         badgeSegments = badgeSegments,
                     )
@@ -62,7 +75,7 @@ class BrowseSourceGridHolder(
                     MangaComfortableGridItem(
                         coverData = cover,
                         title = title,
-                        isSelected = cover.inLibrary,
+                        isSelected = dimCover,
                         showOutline = showOutline,
                         badgeSegments = badgeSegments,
                     )
@@ -90,5 +103,9 @@ class BrowseSourceGridHolder(
     override fun setImage(manga: Manga) {
         if ((view.context as? Activity)?.isDestroyed == true) return
         cover = manga.cover()
+    }
+
+    override fun setDuplicatedInLibrary(duplicated: Boolean) {
+        showDuplicatedBadge = duplicated
     }
 }

@@ -214,6 +214,7 @@ open class BrowseSourcePresenter(
                             browseAsList,
                             sourceListType,
                             outlineCovers,
+                            isDuplicatedInLibrary(it),
                         )
                     }
                 }
@@ -284,6 +285,15 @@ open class BrowseSourcePresenter(
             localManga.title = sManga.title
         }
         return localManga
+    }
+
+    /**
+     * Returns true if the manga is already in the library from another source under the same
+     * title, used to show the "Duplicated" badge in browse.
+     */
+    private suspend fun isDuplicatedInLibrary(manga: Manga): Boolean {
+        if (manga.favorite || !preferences.showDuplicatedInLibraryItems().get()) return false
+        return getManga.awaitDuplicateFavorite(manga.title, manga.source) != null
     }
 
     /**

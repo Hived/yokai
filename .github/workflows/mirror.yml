@@ -1,11 +1,9 @@
 # REF: https://github.com/JamesRobionyRogers/GitHub-to-GitBucket-Action/blob/47a44e9/.github/workflows/push-to-gitbucket.yml
 name: Mirror Repository
 
+# Mirrors to the upstream author's GitLab; disabled on this fork (manual trigger only).
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - master
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

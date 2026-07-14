@@ -22,6 +22,7 @@ class BrowseSourceItem(
     private val catalogueAsList: Preference<Boolean>,
     private val catalogueListType: Preference<Int>,
     private val outlineOnCovers: Preference<Boolean>,
+    private val duplicatedInLibrary: Boolean = false,
 ) :
     AbstractFlexibleItem<BrowseSourceHolder>() {
 
@@ -71,6 +72,7 @@ class BrowseSourceItem(
         position: Int,
         payloads: MutableList<Any?>?,
     ) {
+        holder.setDuplicatedInLibrary(duplicatedInLibrary)
         holder.onSetValues(manga)
     }
 

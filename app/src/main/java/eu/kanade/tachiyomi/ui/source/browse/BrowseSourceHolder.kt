@@ -25,6 +25,12 @@ abstract class BrowseSourceHolder(view: View, adapter: FlexibleAdapter<IFlexible
     abstract fun onSetValues(manga: Manga)
 
     /**
+     * Called before [onSetValues] to tell this holder whether the manga is already in the
+     * library from another source, so it can show the "Duplicated" badge.
+     */
+    open fun setDuplicatedInLibrary(duplicated: Boolean) {}
+
+    /**
      * Updates the image for this holder. Useful to update the image when the manga is initialized
      * and the url is now known.
      *
