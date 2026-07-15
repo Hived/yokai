@@ -55,6 +55,31 @@
             <include layout="@layout/library_grid_recycler"
                 android:id="@+id/library_grid_recycler"/>
 
+            <androidx.viewpager2.widget.ViewPager2
+                android:id="@+id/library_pager"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone" />
+
+            <View
+                android:id="@+id/pager_top_shield"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="?attr/background"
+                android:visibility="gone" />
+
+            <com.google.android.material.tabs.TabLayout
+                android:id="@+id/category_tabs"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="?attr/background"
+                android:visibility="gone"
+                app:tabMode="scrollable"
+                app:tabIndicatorColor="?attr/colorSecondary"
+                app:tabSelectedTextColor="?attr/colorSecondary"
+                app:tabTextColor="?android:attr/textColorSecondary"
+                tools:visibility="visible" />
+
             <View
                 android:id="@+id/recycler_cover"
                 android:layout_width="match_parent"

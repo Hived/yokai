@@ -12,6 +12,8 @@ The format is simplified version of [Keep a Changelog](https://keepachangelog.co
 
 ### Additions
 - Show "Duplicated" badge in Browse for entries already in library from another source, with a toggle in Settings > Browse
+- Option to show library categories as horizontal tabs (like Mihon), in display options > Categories
+  - The library becomes a real pager: each category is its own page, swiping follows your finger with the adjacent category already rendered, exactly like Mihon
 
 ### Fixes
 - Fix chapter download progress indicator showing green instead of the theme accent color (Material 1.14 regression)

@@ -21,9 +21,15 @@ class LibraryCategoryView @JvmOverloads constructor(context: Context, attrs: Att
                 controller?.presenter?.updateLibrary()
                 binding.categoryShow.isEnabled = it
             }
+            showAll.isEnabled = !preferences.horizontalCategoryTabs().get()
             categoryShow.isEnabled = showAll.isChecked
             categoryShow.bindToPreference(preferences.showCategoryInTitle()) {
                 controller?.showMiniBar()
+            }
+            categoryTabs.bindToPreference(preferences.horizontalCategoryTabs()) {
+                // Tabs force single-category pages, so "show all" has no effect while enabled
+                binding.showAll.isEnabled = !it
+                controller?.updateCategoryTabs()
             }
             dynamicToBottom.text = context.getString(MR.strings.move_dynamic_to_bottom)
                 .withSubtitle(context, MR.strings.when_grouping_by_sources_tags)

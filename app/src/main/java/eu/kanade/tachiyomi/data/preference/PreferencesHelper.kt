@@ -362,6 +362,8 @@ class PreferencesHelper(val context: Context, val preferenceStore: PreferenceSto
 
     fun showCategoryInTitle() = preferenceStore.getBoolean("category_in_title", false)
 
+    fun horizontalCategoryTabs() = preferenceStore.getBoolean("horizontal_category_tabs", false)
+
     fun onlySearchPinned() = preferenceStore.getBoolean(Keys.onlySearchPinned, false)
 
     fun hideInLibraryItems() = preferenceStore.getBoolean("browse_hide_in_library_items", false)

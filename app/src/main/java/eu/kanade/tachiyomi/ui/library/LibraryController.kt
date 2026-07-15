@@ -51,8 +51,10 @@ import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import com.bluelinelabs.conductor.ControllerChangeHandler
 import com.bluelinelabs.conductor.ControllerChangeType
 import com.github.florent37.viewtooltip.ViewTooltip
+import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.snackbar.BaseTransientBottomBar
 import com.google.android.material.snackbar.Snackbar
+import com.google.android.material.tabs.TabLayoutMediator
 import dev.icerock.moko.resources.StringResource
 import eu.davidea.flexibleadapter.FlexibleAdapter
 import eu.davidea.flexibleadapter.SelectableAdapter
@@ -129,6 +131,7 @@ import eu.kanade.tachiyomi.util.view.smoothScrollToTop
 import eu.kanade.tachiyomi.util.view.snack
 import eu.kanade.tachiyomi.util.view.text
 import eu.kanade.tachiyomi.util.view.withFadeTransaction
+import eu.kanade.tachiyomi.widget.AutofitRecyclerView
 import eu.kanade.tachiyomi.widget.EmptyView
 import java.util.Locale
 import kotlin.math.abs
@@ -171,6 +174,8 @@ open class LibraryController(
      * Position of the active category.
      */
     private var activeCategory: Int = preferences.lastUsedCategory().get()
+    private var pagerAdapter: LibraryPagerAdapter? = null
+    private var tabsMediator: TabLayoutMediator? = null
     private var lastUsedCategory: Int = preferences.lastUsedCategory().get()
 
     private var justStarted = true
@@ -202,7 +207,13 @@ open class LibraryController(
 
     private var mAdapter: LibraryCategoryAdapter? = null
     private val adapter: LibraryCategoryAdapter
-        get() = mAdapter!!
+        get() = (
+            if (isBindingInitialized && usePagerMode()) {
+                pagerAdapter?.pageAdapterAt(binding.libraryPager.currentItem)
+            } else {
+                null
+            }
+            ) ?: mAdapter!!
 
     private var lastClickPosition = -1
 
@@ -587,6 +598,15 @@ open class LibraryController(
         super.onViewCreated(view)
         mAdapter = LibraryCategoryAdapter(this)
         adapter.stateRestorationPolicy = RecyclerView.Adapter.StateRestorationPolicy.PREVENT_WHEN_EMPTY
+        pagerAdapter = LibraryPagerAdapter(this).also {
+            binding.libraryPager.adapter = it
+        }
+        binding.libraryPager.offscreenPageLimit = 1
+        binding.libraryPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                onPagerPageSelected(position)
+            }
+        })
         setRecyclerLayout()
         binding.libraryGridRecycler.recycler.setHasFixedSize(true)
         binding.libraryGridRecycler.recycler.adapter = adapter
@@ -635,6 +655,11 @@ open class LibraryController(
                     binding.categoryRecycler.updateLayoutParams<ViewGroup.MarginLayoutParams> {
                         topMargin = systemInsets.top + (activityBinding?.searchToolbar?.height ?: 0) + 12.dpToPx
                     }
+                    if (binding.categoryTabs.isVisible) {
+                        binding.libraryGridRecycler.recycler.updatePaddingRelative(
+                            top = binding.libraryGridRecycler.recycler.paddingTop + categoryTabsHeight(),
+                        )
+                    }
                     updateSmallerViewsTopMargins()
                     binding.headerCard.updateLayoutParams<ViewGroup.MarginLayoutParams> {
                         topMargin = systemInsets.top + 4.dpToPx
@@ -678,7 +703,176 @@ open class LibraryController(
         }
     }
 
+    private fun categoryTabText(category: Category): String {
+        val count = presenter.getItemCountInCategories(category.id ?: -1)
+        return if (count > 0) "${category.name} ($count)" else category.name
+    }
+
+    /** Shows/hides the category tab strip; in pager mode the tabs are driven by the pager. */
+    fun updateCategoryTabs() {
+        if (!isBindingInitialized) return
+        val tabs = binding.categoryTabs
+        val pagerMode = usePagerMode()
+        tabs.isVisible = pagerMode
+        if (pagerMode) {
+            if (tabsMediator == null) {
+                tabsMediator = TabLayoutMediator(tabs, binding.libraryPager) { tab, position ->
+                    tab.text = pagerAdapter?.categories?.getOrNull(position)?.let { categoryTabText(it) }
+                }.also { it.attach() }
+            } else {
+                // Refresh names/counts on library updates without rebuilding the strip
+                pagerAdapter?.categories?.forEachIndexed { index, category ->
+                    tabs.getTabAt(index)?.text = categoryTabText(category)
+                }
+            }
+            tabs.post { updateCategoryTabsY() }
+        } else {
+            tabsMediator?.detach()
+            tabsMediator = null
+        }
+        view?.requestApplyInsets()
+    }
+
+    private fun updateCategoryTabsY() {
+        if (!binding.categoryTabs.isVisible) return
+        val activityBinding = activityBinding ?: return
+        val bigToolbarHeight = fullAppBarHeight ?: return
+        binding.categoryTabs.y = (
+            max(0, bigToolbarHeight + activityBinding.appBar.y.roundToInt()) +
+                activityBinding.appBar.paddingTop
+            ).toFloat() + binding.libraryGridRecycler.recycler.translationY
+        if (binding.pagerTopShield.isVisible) {
+            val shieldHeight = (binding.categoryTabs.y + categoryTabsHeight()).roundToInt()
+            if (shieldHeight > 0 && binding.pagerTopShield.height != shieldHeight) {
+                binding.pagerTopShield.updateLayoutParams<ViewGroup.LayoutParams> {
+                    height = shieldHeight
+                }
+            }
+        }
+    }
+
+    /** True when the library should display categories as swipeable pager pages. */
+    fun usePagerMode(): Boolean =
+        !presenter.showAllCategories && !singleCategory && !isSubClass &&
+            preferences.horizontalCategoryTabs().get()
+
+    /** Items to display on the page of [category], falling back to a blank placeholder. */
+    fun pageItems(category: Category): List<LibraryItem> =
+        presenter.getSectionItems(category)?.takeIf { it.isNotEmpty() }
+            ?: presenter.blankItem(category.id ?: 0)
+
+    /** Applies the shared grid/list configuration to a pager page's recycler. */
+    fun configurePageRecycler(recycler: AutofitRecyclerView, categoryAdapter: LibraryCategoryAdapter) {
+        val main = binding.libraryGridRecycler.recycler
+        with(recycler) {
+            itemAnimator = null
+            useStaggered(preferences, uiPreferences)
+            if (libraryLayout == LibraryItem.LAYOUT_LIST) {
+                spanCount = 1
+            } else {
+                setGridSize(preferences)
+            }
+            setPadding(main.paddingLeft, main.paddingTop, main.paddingRight, main.paddingBottom)
+            (manager as? GridLayoutManager)?.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+                override fun getSpanSize(position: Int): Int {
+                    if (libraryLayout == LibraryItem.LAYOUT_LIST) return managerSpanCount
+                    val item = categoryAdapter.getItem(position)
+                    return if (item is LibraryHeaderItem || item is SearchGlobalItem || item is LibraryPlaceholderItem) {
+                        managerSpanCount
+                    } else {
+                        1
+                    }
+                }
+            }
+        }
+    }
+
+    /** Called while a pager page scrolls vertically, to keep the app bar state coherent. */
+    fun onPageScrolled(recycler: RecyclerView, position: Int) {
+        if (!isBindingInitialized || !::elevateAppBar.isInitialized) return
+        if (position != binding.libraryPager.currentItem) return
+        // The header area is pinned in pager mode
+        activityBinding?.appBar?.let {
+            if (it.y != 0f) {
+                it.y = 0f
+                updateCategoryTabsY()
+            }
+        }
+        elevateAppBar(recycler.canScrollVertically(-1))
+    }
+
+    private fun onPagerPageSelected(position: Int) {
+        val category = pagerAdapter?.categories?.getOrNull(position) ?: return
+        if (presenter.currentCategoryId != category.id) {
+            destroyActionModeIfNeeded()
+            presenter.currentCategory = category
+            if (!isSubClass) {
+                preferences.lastUsedCategory().set(category.order)
+            }
+            activeCategory = category.order
+            lastUsedCategory = category.order
+            binding.headerTitle.text = category.name
+            setSubtitle()
+        }
+    }
+
+    /** Swaps between the pager and the classic single-list library views. */
+    private fun syncPagerMode() {
+        val pagerMode = usePagerMode()
+        binding.libraryPager.isVisible = pagerMode
+        binding.pagerTopShield.isVisible = pagerMode
+        binding.libraryGridRecycler.recycler.isVisible = !pagerMode
+        binding.fastScroller.isVisible = !pagerMode
+        activityBinding?.appBar?.lockYPos = pagerMode && isControllerVisible
+        if (pagerMode) {
+            binding.headerCard.isVisible = false
+            activityBinding?.appBar?.y = 0f
+            updateCategoryTabsY()
+        } else {
+            showMiniBar()
+        }
+    }
+
+    private fun onNextLibraryUpdatePager(freshStart: Boolean) {
+        syncPagerMode()
+        binding.progress.isVisible = false
+        (activity as? MainActivity)?.splashState?.ready = true
+        if (!freshStart) justStarted = false
+        if (binding.recyclerLayout.alpha == 0f) {
+            binding.recyclerLayout.animate().alpha(1f).setDuration(500).start()
+        }
+        binding.emptyView.hide()
+        val pagerAdapter = pagerAdapter ?: return
+        pagerAdapter.setCategories(presenter.categories)
+        val index = presenter.categories.indexOfFirst { it.id == presenter.currentCategoryId }
+            .takeIf { it >= 0 }
+            ?: presenter.categories.indexOfFirst { it.order == activeCategory }.takeIf { it >= 0 }
+            ?: 0
+        if (binding.libraryPager.currentItem != index) {
+            binding.libraryPager.setCurrentItem(index, false)
+        }
+        updateCategoryTabs()
+        binding.categoryHopperFrame.isVisible = !preferences.hideHopper().get()
+        adapter.isLongPressDragEnabled = canDrag()
+        with(binding.filterBottomSheet.root) {
+            viewScope.launch {
+                checkForManhwa(presenter.sourceManager)
+            }
+            updateGroupTypeButton(presenter.groupType)
+            setExpandText(canCollapseOrExpandCategory())
+        }
+        if (justStarted && freshStart) {
+            justStarted = false
+        }
+    }
+
+    private fun categoryTabsHeight(): Int {
+        if (!binding.categoryTabs.isVisible) return 0
+        return binding.categoryTabs.height.takeIf { it > 0 } ?: 48.dpToPx
+    }
+
     private fun updateSmallerViewsTopMargins() {
+        updateCategoryTabsY()
         val activityBinding = activityBinding ?: return
         val bigToolbarHeight = fullAppBarHeight ?: return
         val value = max(
@@ -830,6 +1024,8 @@ open class LibraryController(
 
     fun handleGeneralEvent(event: MotionEvent) {
         if (presenter.showAllCategories) return
+        // The pager handles horizontal swipes natively
+        if (usePagerMode()) return
         if (event.action == MotionEvent.ACTION_UP || event.action == MotionEvent.ACTION_CANCEL) {
             val result = catGestureDetector?.onTouchEvent(event) ?: false
             if (!result && binding.libraryGridRecycler.recycler.translationX != 0f) {
@@ -881,6 +1077,15 @@ open class LibraryController(
     }
 
     fun jumpToNextCategory(next: Boolean): Boolean {
+        if (usePagerMode()) {
+            val target = binding.libraryPager.currentItem + if (next) 1 else -1
+            return if (target in 0 until (pagerAdapter?.itemCount ?: 0)) {
+                binding.libraryPager.setCurrentItem(target, true)
+                true
+            } else {
+                false
+            }
+        }
         val category = getVisibleHeader() ?: return false
         if (presenter.showAllCategories) {
             if (!next) {
@@ -1129,6 +1334,12 @@ open class LibraryController(
         }
         view ?: return
         destroyActionModeIfNeeded()
+        singleCategory = presenter.categories.size <= 1
+        if (usePagerMode()) {
+            onNextLibraryUpdatePager(freshStart)
+            return
+        }
+        syncPagerMode()
         if (mangaMap.isNotEmpty()) {
             if (!binding.progress.isVisible) {
                 (activity as? MainActivity)?.showNotificationPermissionPrompt()
@@ -1220,6 +1431,7 @@ open class LibraryController(
 
         binding.categoryHopperFrame.isVisible = !singleCategory && !preferences.hideHopper().get()
         adapter.isLongPressDragEnabled = canDrag()
+        updateCategoryTabs()
         binding.categoryRecycler.setCategories(
             presenter.categories,
             if (adapter.showNumber) {
@@ -1336,6 +1548,7 @@ open class LibraryController(
             setUpdateListener {
                 activityBinding?.appBar?.updateAppBarAfterY(binding.libraryGridRecycler.recycler)
                 updateHopperY()
+                updateCategoryTabsY()
             }
         }.start()
         binding.recyclerShadow.animate().translationY(translateY - 8.dpToPx).start()
@@ -1365,6 +1578,13 @@ open class LibraryController(
     }
 
     private fun scrollToHeader(pos: Int, removeObserver: Boolean = true) {
+        if (usePagerMode()) {
+            val index = presenter.categories.indexOfFirst { it.order == pos }
+            if (index >= 0) {
+                binding.libraryPager.setCurrentItem(index, true)
+            }
+            return
+        }
         if (removeObserver) {
             removeStaggeredObserver()
         }
@@ -1458,6 +1678,9 @@ open class LibraryController(
             adapter.removeAllScrollableHeaders()
         }
         adapter.setFilter(query)
+        if (usePagerMode()) {
+            pagerAdapter?.setFilter(this.query.takeIf { it.isNotBlank() })
+        }
         if (presenter.currentLibraryItems.isEmpty()) return true
         viewScope.launchUI {
             adapter.performFilterAsync()

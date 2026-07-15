@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.ui.library
 import android.graphics.Rect
 import android.view.GestureDetector
 import android.view.MotionEvent
+import androidx.core.view.isVisible
 import eu.kanade.tachiyomi.util.system.isLTR
 import eu.kanade.tachiyomi.util.view.activityBinding
 import kotlin.math.abs
@@ -22,14 +23,16 @@ class LibraryCategoryGestureDetector(private val controller: LibraryController?)
         startingX = e.x
         startingY = e.y
         controller ?: return false
-        val startingOnLibraryView = listOf(
+        // Views that are gone or recycled (e.g. the header when scrolled off-screen) can't be
+        // touched, so they are skipped instead of aborting with a stale [cancelled] state
+        val startingOnLibraryView = listOfNotNull(
             controller.activityBinding?.bottomNav,
             controller.binding.filterBottomSheet.root,
             controller.binding.categoryHopperFrame,
             controller.activityBinding?.appBar,
+            controller.binding.categoryTabs.takeIf { it.isVisible },
             controller.visibleHeaderHolder()?.itemView,
         ).none {
-            it ?: return false
             val viewRect = Rect()
             it.getGlobalVisibleRect(viewRect)
             viewRect.contains(e.x.toInt(), e.y.toInt())

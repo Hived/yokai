@@ -152,7 +152,8 @@ class LibraryPresenter(
     private var hiddenLibraryItems: List<LibraryItem> = emptyList()
     var forceShowAllCategories = false
     val showAllCategories
-        get() = forceShowAllCategories || preferences.showAllCategories().get()
+        get() = forceShowAllCategories ||
+            (preferences.showAllCategories().get() && !preferences.horizontalCategoryTabs().get())
 
     private val libraryIsGrouped
         get() = groupType != UNGROUPED
@@ -320,6 +321,9 @@ class LibraryPresenter(
             true,
         )
     }
+
+    /** Items of a single category's section, used to render the adjacent page while swiping. */
+    fun getSectionItems(category: Category): List<LibraryItem>? = libraryToDisplay[category]
 
     fun getMangaInCategories(catId: Int?): List<LibraryManga>? {
         catId ?: return null
@@ -811,6 +815,9 @@ class LibraryPresenter(
 
         preferences.collapsedCategories().changes(),
         preferences.collapsedDynamicCategories().changes(),
+        // Not read below, but rebuilds the library when toggled since it forces single-category
+        // mode (it[8] is combined with it in the showAllCategories property)
+        preferences.horizontalCategoryTabs().changes(),
     ) {
        ItemPreferences(
            filterDownloaded = it[0] as Int,
@@ -881,7 +888,7 @@ class LibraryPresenter(
                     libraryMangaList,
                     prefs.sortingMode,
                     prefs.sortAscending,
-                    prefs.showAllCategories,
+                    showAllCategories,
                     prefs.collapsedCategories,
                     defaultCategory,
                 )
